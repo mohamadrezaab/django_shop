@@ -7,4 +7,4 @@ class OrdersConfig(AppConfig):
 
     
      def ready(self):
-        import myapp.signals
+        import.signals
