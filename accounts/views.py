@@ -7,6 +7,7 @@ from .models import OtpCode, User
 from django.contrib import messages
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.mixins import LoginRequiredMixin
+from datetime import datetime, timedelta
 
 
 class UserRegisterView(View):
@@ -33,31 +34,39 @@ class UserRegisterView(View):
 			return redirect('accounts:verify_code')
 		return render(request, self.template_name, {'form':form})
 
-
 class UserRegisterVerifyCodeView(View):
-	form_class = VerifyCodeForm
+    form_class = VerifyCodeForm
 
-	def get(self, request):
-		form = self.form_class
-		return render(request, 'accounts/verify.html', {'form':form})
+    def get(self, request):
+        form = self.form_class
+        return render(request, 'accounts/verify.html', {'form':form})
 
-	def post(self, request):
-		user_session = request.session['user_registration_info']
-		code_instance = OtpCode.objects.get(phone_number=user_session['phone_number'])
-		form = self.form_class(request.POST)
-		if form.is_valid():
-			cd = form.cleaned_data
-			if cd['code'] == code_instance.code:
-				User.objects.create_user(user_session['phone_number'], user_session['email'],
-										 user_session['full_name'], user_session['password'])
+    def post(self, request):
+        user_session = request.session.get('user_registration_info')
+        if user_session:
+            code_instance = OtpCode.objects.get(phone_number=user_session['phone_number'])
+            form = self.form_class(request.POST)
+            if form.is_valid():
+                cd = form.cleaned_data
+                if cd['code'] == code_instance.code:
+                    registration_time = code_instance.created
+                    current_time = datetime.now()
+                    time_difference = current_time - registration_time
+                    if time_difference.total_seconds() <= 120:
+                        User.objects.create_user(user_session['phone_number'], user_session['email'],
+                                                 user_session['full_name'], user_session['password'])
+                        code_instance.delete()
+                        messages.success(request, 'you registered.', 'success')
+                        return redirect('home:home')
+                    else:
+                        messages.error(request, 'Registration session expired. Please register again.', 'danger')
+                else:
+                    messages.error(request, 'this code is wrong', 'danger')
+                    return redirect('accounts:verify_code')
+            return redirect('home:home')
+        else:
+            return redirect('home:home')
 
-				code_instance.delete()
-				messages.success(request, 'you registered.', 'success')
-				return redirect('home:home')
-			else:
-				messages.error(request, 'this code is wrong', 'danger')
-				return redirect('accounts:verify_code')
-		return redirect('home:home')
 
 
 class UserLogoutView(LoginRequiredMixin, View):
