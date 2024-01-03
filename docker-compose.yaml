@@ -1,6 +1,11 @@
 version: "3.9"
 
 services:
+  # Redis
+  redis:
+    image: redis:alpine
+    container_name: redis
+
   rabbitmq:
     container_name: rabbitmq
     image: rabbitmq:latest
